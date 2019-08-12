@@ -19,7 +19,7 @@ wss.on('connection', (ws) => {
 
     wss.clients
       .forEach(client => {
-        const clientIsNotSenderOfMessage = client != ws;
+        const clientIsNotSenderOfMessage = client !== ws;
         if (clientIsNotSenderOfMessage) {
           client.send(message);
         }
@@ -28,5 +28,5 @@ wss.on('connection', (ws) => {
 });
 
 server.listen(process.env.PORT || 8999, () => {
-  console.log(`Scrummy Server running on port ${server.address().port}`);
+  console.log(`Server running on port ${server.address().port}`);
 });
