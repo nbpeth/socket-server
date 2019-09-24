@@ -1,12 +1,12 @@
-var express = require('express');
-var bodyParser = require('body-parser');
-var cors = require('cors');
-var app = express();
-var http = require('http');
+const express = require('express');
+const bodyParser = require('body-parser');
+const cors = require('cors');
+const app = express();
+const http = require('http');
 const WebSocket = require('ws');
 
-app.use(bodyParser.urlencoded({extended: false}))
-app.use(bodyParser.json())
+app.use(bodyParser.urlencoded({extended: false}));
+app.use(bodyParser.json());
 app.use(cors);
 
 const server = http.createServer(app);
@@ -29,60 +29,89 @@ handleNewClients = (ws) => {
 handleIncomingMessages = (message) => {
     const messageObj = JSON.parse(message);
     const messageKey = Object.keys(messageObj)[0];
-    const messageValue = messageObj[messageKey]
+    const messageValue = Object.values(messageObj)[0];
 
-    console.log('received:', messageObj);
+    // console.log('received!!', message);
 
     switch (messageKey) {
         case 'session-created':
             createNewSession(messageObj['session-created']);
-            notifyClients(wss, messageObj);
+            notifyClients(state);
             break;
+
         case 'state-of-the-state':
             notifyCaller(formatMessage('state-of-the-state', state));
             break;
+
         case 'session-state':
-            const sessionId = messageObj['session-state'];
-            console.log('??', sessionId, messageObj, messageObj['session-state'], state)
-            notifyCaller(formatMessage('session-state', state.sessions[sessionId]));
+            notifyCaller(formatMessage('session-state', state));
+            break;
+
+        case 'participant-update':
+            addParticipantToSession(messageValue);
+            break;
+
+        case 'participant-removed':
+            console.log('removing!', messageValue)
+            removeParticipantFromSession(messageValue);
             break;
         default:
+        // nothing
     }
+};
+
+addParticipantToSession = (messageValue) => {
+    const sessionToUpdate = Object.keys(messageValue)[0];
+    const merged = {...state.sessions[sessionToUpdate].participants, ...messageValue[sessionToUpdate].participants};
+    state.sessions[sessionToUpdate].participants = merged;
+    const message = formatMessage('participant-update', state);
+
+    notifyClients(message);
+};
+
+removeParticipantFromSession = (messageValue) => {
+    const sessionToUpdate = Object.keys(messageValue)[0];
+    const userToRemove = messageValue[sessionToUpdate];
+    delete state.sessions[sessionToUpdate].participants[userToRemove];
+    const message = formatMessage('participant-removed', state);
+
+    notifyClients(message);
+}
+
+removeParticipant = (messageValue) => {
 
 }
 
-sendCurrentState = (ws, state) => ws.send(JSON.stringify(state))
+sendCurrentState = (ws, state) => ws.send(JSON.stringify(state));
 
 notifyClients = (message) => {
     wss.clients
         .forEach(client => {
             // const clientIsNotSenderOfMessage = client !== ws;
             // if (clientIsNotSenderOfMessage) {
-            // console.log('sending', JSON.stringify(message));
             client.send(JSON.stringify(message));
-            // }
         });
-}
+};
 
 notifyCaller = (message) => {
     wss.clients
         .forEach(client => {
-            if (client == _ws) {
+            if (client === _ws) {
                 client.send(JSON.stringify(message));
             }
         });
-}
+};
 
 createNewSession = (message) => {
     const sessionName = message && message.sessionName ? message.sessionName : undefined;
     if (!sessionName) {
         return;
     }
-    state.sessions[sessionName] = {}
-    const stateMessage = formatMessage('session-created', state)
+    state.sessions[sessionName] = {participants: {}};
+    const stateMessage = formatMessage('session-created', state);
 
     notifyClients(stateMessage)
-}
+};
 
 formatMessage = (key, messageBody) => ({[key]: messageBody});
 
