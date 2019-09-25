@@ -21,74 +21,33 @@ handleNewClients = (ws) => {
     // new connection? ship the current app state
     const message = formatMessage('state-of-the-state', state);
 
-    sendCurrentState(ws, message);
+    notifyCaller(message);
 
     ws.on('message', handleIncomingMessages);
 };
 
 handleIncomingMessages = (message) => {
-    const messageObj = JSON.parse(message);
-    const messageKey = Object.keys(messageObj)[0];
-    const messageValue = Object.values(messageObj)[0];
+    const messageData = JSON.parse(message);
+    const eventType = messageData.eventType;
+    const payload = messageData.payload;
 
-    // console.log('received!!', message);
+    console.log('received!!', message);
+    console.log('type:::', eventType)
 
-    switch (messageKey) {
-        case 'session-created':
-            createNewSession(messageObj['session-created']);
-            notifyClients(state);
-            break;
-
+    switch (eventType) {
         case 'state-of-the-state':
-            notifyCaller(formatMessage('state-of-the-state', state));
+            notifyCaller(formatMessage(eventType, state));
             break;
-
-        case 'session-state':
-            notifyCaller(formatMessage('session-state', state));
-            break;
-
-        case 'participant-update':
-            addParticipantToSession(messageValue);
-            break;
-
-        case 'participant-removed':
-            console.log('removing!', messageValue)
-            removeParticipantFromSession(messageValue);
-            break;
-        default:
-        // nothing
+        case 'session-created':
+            createNewSession(payload);
+            notifyClients(formatMessage(eventType, state))
     }
 };
 
-addParticipantToSession = (messageValue) => {
-    const sessionToUpdate = Object.keys(messageValue)[0];
-    const merged = {...state.sessions[sessionToUpdate].participants, ...messageValue[sessionToUpdate].participants};
-    state.sessions[sessionToUpdate].participants = merged;
-    const message = formatMessage('participant-update', state);
-
-    notifyClients(message);
-};
-
-removeParticipantFromSession = (messageValue) => {
-    const sessionToUpdate = Object.keys(messageValue)[0];
-    const userToRemove = messageValue[sessionToUpdate];
-    delete state.sessions[sessionToUpdate].participants[userToRemove];
-    const message = formatMessage('participant-removed', state);
-
-    notifyClients(message);
-}
-
-removeParticipant = (messageValue) => {
-
-}
-
-sendCurrentState = (ws, state) => ws.send(JSON.stringify(state));
 
 notifyClients = (message) => {
     wss.clients
         .forEach(client => {
-            // const clientIsNotSenderOfMessage = client !== ws;
-            // if (clientIsNotSenderOfMessage) {
             client.send(JSON.stringify(message));
         });
 };
@@ -113,7 +72,10 @@ createNewSession = (message) => {
     notifyClients(stateMessage)
 };
 
-formatMessage = (key, messageBody) => ({[key]: messageBody});
+formatMessage = (eventType, payload) => ({
+    eventType: eventType,
+    payload: payload
+});
 
 wss.on('connection', handleNewClients);
 
