@@ -75,7 +75,11 @@ resetPoints = (messageData) => {
   const sessionData = state.sessions[requestedSession];
   // ew
   Object.values(sessionData).forEach(participant => {
-    Object.values(participant).forEach(p => p.point = 0);
+    Object.values(participant).forEach(p => {
+      if (p) {
+        p.point = 0;
+      }
+    });
   });
 
   notifyClients(formatMessage(eventType, sessionData, requestedSession))
